@@ -1,0 +1,130 @@
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
+#include <Servo.h>
+
+// --- Wi-Fi & Server Config ---
+const char* WIFI_SSID     = "YOUR_WIFI_SSID";
+const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
+const char* HOSTNAME      = "switchfinger";
+
+// --- Servo & Timing Config (Tune to your 3D arm & switch travel) ---
+const int SERVO_PIN      = D4;     // GPIO2 on NodeMCU/ESP8266
+const int ANGLE_REST     = 90;     // Neutral / resting position (degrees)
+const int ANGLE_ON       = 45;     // Angle that presses the ON side
+const int ANGLE_OFF      = 135;    // Angle that presses the OFF side
+const int MOVE_DELAY_MS  = 450;    // Time allowed for arm to reach target angle
+const int HOLD_DELAY_MS  = 300;    // Hold time against the button before returning
+
+ESP8266WebServer server(80);
+Servo fingerServo;
+
+bool isSwitchOn = false;
+bool isMoving   = false;
+
+// Non-blocking-friendly servo actuation helper
+void moveFingerTo(int targetAngle, bool returnToRestAfterHold) {
+  isMoving = true;
+
+  fingerServo.attach(SERVO_PIN);
+  fingerServo.write(targetAngle);
+  delay(MOVE_DELAY_MS);
+
+  if (returnToRestAfterHold) {
+    delay(HOLD_DELAY_MS);
+    fingerServo.write(ANGLE_REST);
+    delay(MOVE_DELAY_MS);
+  }
+
+  // Detach to prevent jitter/buzzing and save power while idle
+  fingerServo.detach();
+  isMoving = false;
+}
+
+String stateJson() {
+  String json = "{\"state\":\"";
+  json += (isSwitchOn ? "ON" : "OFF");
+  json += "\",\"moving\":";
+  json += (isMoving ? "true" : "false");
+  json += ",\"rssi\":";
+  json += String(WiFi.RSSI());
+  json += "}";
+  return json;
+}
+
+void handleRoot() {
+  String html = "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'>"
+                "<title>Switchfinger</title>"
+                "<style>body{font-family:sans-serif;text-align:center;padding:2rem;}"
+                "button{font-size:1.2rem;padding:0.8rem 1.6rem;margin:0.5rem;cursor:pointer;}</style></head><body>"
+                "<h2>Switchfinger</h2>"
+                "<p>Current state: <strong id='st'>" + String(isSwitchOn ? "ON" : "OFF") + "</strong></p>"
+                "<button onclick=\"fetch('/on').then(()=>location.reload())\">Turn ON</button>"
+                "<button onclick=\"fetch('/off').then(()=>location.reload())\">Turn OFF</button>"
+                "<button onclick=\"fetch('/press').then(()=>location.reload())\">Pulse / Toggle</button>"
+                "</body></html>";
+  server.send(200, "text/html", html);
+}
+
+void handleOn() {
+  moveFingerTo(ANGLE_ON, true);
+  isSwitchOn = true;
+  server.send(200, "application/json", stateJson());
+}
+
+void handleOff() {
+  moveFingerTo(ANGLE_OFF, true);
+  isSwitchOn = false;
+  server.send(200, "application/json", stateJson());
+}
+
+void handlePress() {
+  if (isSwitchOn) {
+    moveFingerTo(ANGLE_OFF, true);
+    isSwitchOn = false;
+  } else {
+    moveFingerTo(ANGLE_ON, true);
+    isSwitchOn = true;
+  }
+  server.send(200, "application/json", stateJson());
+}
+
+void handleStatus() {
+  server.send(200, "application/json", stateJson());
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(100);
+
+  // Set initial resting position briefly so the arm starts in a known spot
+  fingerServo.attach(SERVO_PIN);
+  fingerServo.write(ANGLE_REST);
+  delay(300);
+  fingerServo.detach();
+
+  WiFi.mode(WIFI_STA);
+  WiFi.hostname(HOSTNAME);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  Serial.print("Connecting to Wi-Fi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println();
+  Serial.print("Connected! IP: ");
+  Serial.println(WiFi.localIP());
+
+  server.on("/", HTTP_GET, handleRoot);
+  server.on("/on", HTTP_GET, handleOn);
+  server.on("/off", HTTP_GET, handleOff);
+  server.on("/press", HTTP_GET, handlePress);
+  server.on("/status", HTTP_GET, handleStatus);
+
+  server.begin();
+  Serial.println("HTTP server started on port 80");
+}
+
+void loop() {
+  server.handleClient();
+}
