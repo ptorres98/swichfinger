@@ -37,16 +37,15 @@ import socket
 import time
 from machine import Pin, PWM
 
-# ==============================================================================
+
 # WI-FI CONFIGURATION
-# ==============================================================================
+
 WIFI_SSID = "YOUR_WIFI_SSID"
 WIFI_PASS = "YOUR_WIFI_PASSWORD"
 DEVICE_NAME = "finger-test"
 
-# ==============================================================================
 # SERVO MOTOR CONFIGURATION (GPIO 5 / Pin D1)
-# ==============================================================================
+
 servo = PWM(Pin(5), freq=50)
 
 ANGLE_OFF = 90   # Idle / OFF position (90 degrees)
