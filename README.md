@@ -71,9 +71,8 @@ def turn_off():
 # Move to default OFF position on startup
 turn_off()
 
-# ==============================================================================
 # WI-FI CONNECTION (DHCP)
-# ==============================================================================
+
 def connect_wifi():
    wlan = network.WLAN(network.STA_IF)
    wlan.active(True)
@@ -96,9 +95,9 @@ def connect_wifi():
    else:
        print("Wi-Fi connection failed.")
 
-# ==============================================================================
+
 # HTTP SERVER (PORT 80)
-# ==============================================================================
+
 def start_server():
    addr = socket.getaddrinfo('0.0.0.0', 80)[0][-1]
    s = socket.socket()
