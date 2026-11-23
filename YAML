@@ -1,0 +1,10 @@
+command_line:
+  - switch:
+      name: Switchfinger
+      unique_id: switchfinger_esp8266_01
+      command_on: /usr/bin/curl -sf --max-time 5 http://SWITCHFINGER_IP/on > /dev/null
+      command_off: /usr/bin/curl -sf --max-time 5 http://SWITCHFINGER_IP/off > /dev/null
+      command_state: /usr/bin/curl -sf --max-time 5 http://SWITCHFINGER_IP/status
+      value_template: "{{ value_json is defined and value_json.state == 'ON' }}"
+      scan_interval: 30
+      command_timeout: 10
